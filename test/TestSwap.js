@@ -1,10 +1,14 @@
 const BSCSwapAgentImpl = artifacts.require("BSCSwapAgentImpl");
 const ETHSwapAgentImpl = artifacts.require("ETHSwapAgentImpl");
+const ETHSwapAgentUpgradeableProxy = artifacts.require("ETHSwapAgentUpgradeableProxy");
+const BSCSwapAgentUpgradeableProxy = artifacts.require("BSCSwapAgentUpgradeableProxy");
 
 const ERC20ABC = artifacts.require("ERC20ABC");
 const ERC20DEF = artifacts.require("ERC20DEF");
 const ERC20EMPTYNAME = artifacts.require("ERC20EMPTYNAME");
 const ERC20EMPTYSYMBOL = artifacts.require("ERC20EMPTYSYMBOL");
+const ERC20DVG = artifacts.require("ERC20DVG");
+const BEP20DVG = artifacts.require("BEP20DVG");
 
 const fs = require('fs');
 const Web3 = require('web3');
@@ -15,10 +19,62 @@ let createdBEP20TokenAddr;
 let swapTxFromETH2BSC;
 
 contract('ETHSwapAgent and BSCSwapAgent', (accounts) => {
-    it('Register Standard ERC20 and create swap pair', async () => {
-        const ethSwap = await ETHSwapAgentImpl.deployed();
-        const bscSwap = await BSCSwapAgentImpl.deployed();
 
+    let ethSwapProxy;
+    let ethSwap;
+    let bscSwapProxy;
+    let bscSwap;
+
+    before('setup', async () => {
+        ethSwapProxy = await ETHSwapAgentUpgradeableProxy.deployed();
+        ethSwap = await ETHSwapAgentImpl.at(ethSwapProxy.address);
+        bscSwapProxy = await BSCSwapAgentUpgradeableProxy.deployed();
+        bscSwap = await BSCSwapAgentImpl.at(bscSwapProxy.address);
+    });
+
+    it('Swap DVG from ETH to BSC', async () => {
+        const erc20DVG = await ERC20DVG.deployed();
+
+        await erc20DVG.approve(ethSwap.address, "1000000000000", {from: accounts[0]})
+
+        try {
+            await ethSwap.swapETH2BSC(ERC20DVG.address, "100000", {from: accounts[0]})
+            assert.fail();
+        } catch (error) {
+            assert.ok(error.toString().includes("swap fee not equal"))
+        }
+        
+        let swapTx = await ethSwap.swapETH2BSC(ERC20DVG.address, "100000", {from: accounts[0], value:web3.utils.toBN(10000000)});
+
+        truffleAssert.eventEmitted(swapTx, "SwapStarted",(ev) => {
+            swapTxFromETH2BSC = swapTx.tx;
+            return ev.erc20Addr === ERC20DVG.address && ev.fromAddr === accounts[0] && ev.amount.toString() === "100000";
+        });
+
+        let fillTx = await bscSwap.fillETH2BSCSwap(swapTxFromETH2BSC, ERC20DVG.address, accounts[0], "100000", {from: accounts[0]});
+        truffleAssert.eventEmitted(fillTx, "SwapFilled",(ev) => {
+            return ev.bep20Addr === BEP20DVG.address && ev.amount.toString() === "100000";
+        });
+    });
+
+    it('Swap DVG from BSC to ETH', async () => {
+        const bep20DVG = await BEP20DVG.deployed();
+
+        await bep20DVG.approve(bscSwap.address, "1000000000000", {from: accounts[0]})
+
+        let swapTx = await bscSwap.swapBSC2ETH(BEP20DVG.address, "100000", {from: accounts[0], value:web3.utils.toBN(10000000000000000)});
+
+        truffleAssert.eventEmitted(swapTx, "SwapStarted",(ev) => {
+            return ev.bep20Addr === BEP20DVG.address && ev.erc20Addr === ERC20DVG.address && ev.amount.toString() === "100000";
+        });
+
+        let fillTx = await ethSwap.fillBSC2ETHSwap(swapTx.tx, ERC20DVG.address, accounts[0], "100000", {from: accounts[0]});
+        truffleAssert.eventEmitted(fillTx, "SwapFilled",(ev) => {
+            return ev.erc20Addr === ERC20DVG.address && ev.amount.toString() === "100000";
+        });
+    });
+
+    it('Register Standard ERC20 and create swap pair', async () => {
         let isERC20ABCRegistered = await ethSwap.registeredERC20(ERC20ABC.address);
         assert.equal(isERC20ABCRegistered, false, "wrong register status");
         let isERC20DEFRegistered = await ethSwap.registeredERC20(ERC20DEF.address);
@@ -70,10 +126,9 @@ contract('ETHSwapAgent and BSCSwapAgent', (accounts) => {
     });
 
     it('Swap from ETH to BSC', async () => {
-        const ethSwap = await ETHSwapAgentImpl.deployed();
         const erc20ABC = await ERC20ABC.deployed();
 
-        await erc20ABC.approve(ETHSwapAgentImpl.address, "1000000000000", {from: accounts[0]})
+        await erc20ABC.approve(ethSwap.address, "1000000000000", {from: accounts[0]})
 
         try {
             await ethSwap.swapETH2BSC(ERC20ABC.address, "100000", {from: accounts[0]})
@@ -128,13 +183,11 @@ contract('ETHSwapAgent and BSCSwapAgent', (accounts) => {
     });
 
     it('Swap from BSC to ETH', async () => {
-        const bscSwap = await BSCSwapAgentImpl.deployed();
-
         const erc20ABIJsonFile = "test/abi/erc20ABI.json";
         const erc20ABI= JSON.parse(fs.readFileSync(erc20ABIJsonFile));
         const createdBEP2OToken = new web3.eth.Contract(erc20ABI, createdBEP20TokenAddr);
 
-        await createdBEP2OToken.methods.approve(BSCSwapAgentImpl.address, "1000000000000").send({from: accounts[0]});
+        await createdBEP2OToken.methods.approve(bscSwap.address, "1000000000000").send({from: accounts[0]});
 
         let fillTx = await bscSwap.fillETH2BSCSwap(swapTxFromETH2BSC, ERC20ABC.address, accounts[0], "100000", {from: accounts[0]});
         truffleAssert.eventEmitted(fillTx, "SwapFilled",(ev) => {
@@ -165,8 +218,6 @@ contract('ETHSwapAgent and BSCSwapAgent', (accounts) => {
     });
 
     it('Set BSC to ETH swap fee', async () => {
-        const bscSwap = await BSCSwapAgentImpl.deployed();
-
         await bscSwap.setSwapFee("100000", {from: accounts[0]});
         let swapFee = await bscSwap.swapFee();
 
@@ -174,8 +225,6 @@ contract('ETHSwapAgent and BSCSwapAgent', (accounts) => {
     });
 
     it('Set ETH to BSC swap fee', async () => {
-        const ethSwap = await ETHSwapAgentImpl.deployed();
-
         await ethSwap.setSwapFee("100000", {from: accounts[0]});
         let swapFee = await ethSwap.swapFee();
 
@@ -183,24 +232,21 @@ contract('ETHSwapAgent and BSCSwapAgent', (accounts) => {
     });
 
     it('ETH ownership', async () => {
-        const ethSwap = await ETHSwapAgentImpl.deployed();
-
-        await ethSwap.transferOwnership(accounts[1], {from: accounts[0]});
+        await ethSwap.transferOwnership(accounts[2], {from: accounts[0]});
         let newOwner = await ethSwap.owner();
 
-        assert.ok(newOwner === accounts[1]);
+        assert.ok(newOwner === accounts[2]);
 
-        await ethSwap.renounceOwnership({from: accounts[1]});
+        await ethSwap.renounceOwnership({from: accounts[2]});
     });
 
     it('BSC ownership', async () => {
-        const bscSwap = await BSCSwapAgentImpl.deployed();
-
-        await bscSwap.transferOwnership(accounts[1], {from: accounts[0]});
+        await bscSwap.transferOwnership(accounts[2], {from: accounts[0]});
         let newOwner = await bscSwap.owner();
 
-        assert.ok(newOwner === accounts[1]);
+        assert.ok(newOwner === accounts[2]);
 
-        await bscSwap.renounceOwnership({from: accounts[1]});
+        await bscSwap.renounceOwnership({from: accounts[2]});
     });
+
 });

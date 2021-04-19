@@ -10,12 +10,14 @@ contract ETHSwapAgentImpl is Context, Initializable {
     using SafeERC20 for IERC20;
 
     mapping(address => bool) public registeredERC20;
+    mapping(address => bool) public registeredBEP20;
     mapping(bytes32 => bool) public filledBSCTx;
     address payable public owner;
     uint256 public swapFee;
 
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event SwapPairRegister(address indexed sponsor,address indexed erc20Addr, string name, string symbol, uint8 decimals);
+    event SwapPairWithBep20Register(address indexed sponsor,address indexed erc20Addr, string name, string symbol, uint8 decimals, address indexed bep20Addr);
     event SwapStarted(address indexed erc20Addr, address indexed fromAddr, uint256 amount, uint256 feeAmount);
     event SwapFilled(address indexed erc20Addr, bytes32 indexed bscTxHash, address indexed toAddress, uint256 amount);
 
@@ -89,6 +91,24 @@ contract ETHSwapAgentImpl is Context, Initializable {
         registeredERC20[erc20Addr] = true;
 
         emit SwapPairRegister(msg.sender, erc20Addr, name, symbol, decimals);
+        return true;
+    }
+
+    function registerSwapPairWithBep20(address erc20Addr, address bep20Addr) onlyOwner external returns (bool) {
+        require(!registeredERC20[erc20Addr], "already registered");
+        require(!registeredBEP20[bep20Addr], "BEP20 token already registered");
+
+        string memory name = IERC20Query(erc20Addr).name();
+        string memory symbol = IERC20Query(erc20Addr).symbol();
+        uint8 decimals = IERC20Query(erc20Addr).decimals();
+
+        require(bytes(name).length>0, "empty name");
+        require(bytes(symbol).length>0, "empty symbol");
+
+        registeredERC20[erc20Addr] = true;
+        registeredBEP20[bep20Addr] = true;
+
+        emit SwapPairWithBep20Register(msg.sender, erc20Addr, name, symbol, decimals, bep20Addr);
         return true;
     }
 

@@ -10,10 +10,10 @@ interface ISwap {
      * - `msg.sender` must be the token owner
      * - `_mintable` must be true
      */
-    function mintTo(uint256 amount, address recipient) external returns (bool);
+    function mint(address recipient, uint256 amount) external;
 
     /**
     * @dev Burn `amount` tokens and decreasing the total supply.
     */
-    function burn(uint256 amount) external returns (bool);
+    function burn(address from, uint256 amount) external;
 }

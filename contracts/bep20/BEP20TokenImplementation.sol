@@ -210,10 +210,9 @@ contract BEP20TokenImplementation is Context, IBEP20, ISwap, Initializable {
      * - `msg.sender` must be the token owner
      * - `_mintable` must be true
      */
-    function mint(uint256 amount) public onlyOwner returns (bool) {
+    function mint(uint256 amount) public onlyOwner {
         require(_mintable, "this token is not mintable");
         _mint(_msgSender(), amount);
-        return true;
     }
 
     /**
@@ -225,19 +224,20 @@ contract BEP20TokenImplementation is Context, IBEP20, ISwap, Initializable {
      * - `msg.sender` must be the token owner
      * - `_mintable` must be true
      */
-    function mintTo(uint256 amount, address recipient) override external onlyOwner returns (bool) {
+    function mint(address recipient, uint256 amount) override external onlyOwner {
         require(_mintable, "this token is not mintable");
         _mint(recipient, amount);
-        return true;
     }
 
-
     /**
-    * @dev Burn `amount` tokens and decreasing the total supply.
-    */
-    function burn(uint256 amount) override external returns (bool) {
-        _burn(_msgSender(), amount);
-        return true;
+     * @dev Burn `amount` tokens and decreasing the total supply.
+     *
+     * Requirements
+     *
+     * - `msg.sender` must be the token owner
+     */
+    function burn(address from, uint256 amount) override external onlyOwner {
+        _burn(from, amount);
     }
 
     /**

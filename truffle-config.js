@@ -18,11 +18,23 @@
  *
  */
 
-// const HDWalletProvider = require('@truffle/hdwallet-provider');
+const HDWalletProvider = require('@truffle/hdwallet-provider');
 // const infuraKey = "fj4jll3k.....";
 //
 // const fs = require('fs');
 // const mnemonic = fs.readFileSync(".secret").toString().trim();
+
+require('dotenv').config();
+
+const ropstenPrivateKeys = [
+  process.env.ROPSTEN_SWAP_OWNER_PRIVKEY,
+  process.env.ROPSTEN_PROXY_ADMIN_PRIVKEY,
+];
+
+const bscTestnetPrivateKeys = [
+  process.env.ROPSTEN_SWAP_OWNER_PRIVKEY,
+  process.env.ROPSTEN_PROXY_ADMIN_PRIVKEY,
+];
 
 module.exports = {
   /**
@@ -60,14 +72,22 @@ module.exports = {
 
     // Useful for deploying to a public network.
     // NB: It's important to wrap the provider as a function.
-    // ropsten: {
-      // provider: () => new HDWalletProvider(mnemonic, `https://ropsten.infura.io/v3/YOUR-PROJECT-ID`),
-      // network_id: 3,       // Ropsten's id
-      // gas: 5500000,        // Ropsten has a lower block limit than mainnet
-      // confirmations: 2,    // # of confs to wait between deployments. (default: 0)
-      // timeoutBlocks: 200,  // # of blocks before a deployment times out  (minimum/default: 50)
-      // skipDryRun: true     // Skip dry run before migrations? (default: false for public nets )
-    // },
+    ropsten: {
+      provider: () => new HDWalletProvider(ropstenPrivateKeys, process.env.ROPSTEN_URL, 0, 2), //start at address_index 0 and load both addresses
+      network_id: 3,       // Ropsten's id
+      gas: 5500000,        // Ropsten has a lower block limit than mainnet
+      confirmations: 1,    // # of confs to wait between deployments. (default: 0)
+      timeoutBlocks: 200,  // # of blocks before a deployment times out  (minimum/default: 50)
+      skipDryRun: true     // Skip dry run before migrations? (default: false for public nets )
+    },
+
+    bsctestnet: {
+      provider: () => new HDWalletProvider(bscTestnetPrivateKeys, process.env.BSC_TESTNET_URL, 0, 2), //start at address_index 0 and load both addresses
+      network_id: 97,
+      timeoutBlocks: 200,
+      confirmations: 1,
+      production: true    // Treats this network as if it was a public net. (default: false)
+    }
 
     // Useful for private networks
     // private: {
@@ -81,7 +101,14 @@ module.exports = {
   mocha: {
     // timeout: 100000
   },
-  plugins: ["solidity-coverage"],
+  plugins: [
+    "truffle-plugin-verify",
+    "solidity-coverage",
+  ],
+  api_keys: {
+    etherscan: process.env.ETHERSCAN_API_KEY,
+    bscscan: process.env.BSCSCAN_API_KEY,
+  },
   // Configure your compilers
   compilers: {
     solc: {

@@ -21,7 +21,7 @@ ETH BSC Swap Contracts are responsible for registering swap pairs and swapping a
 
 Once swap pair is registered, users can swap tokens from ETH to BSC.
 
-1. Users call `swapBSC2ETH` via ETHSwapAgent and specify erc20 token address, amount and swap fee.
+1. Users call `swapETH2BSC` via ETHSwapAgent and specify erc20 token address, amount and swap fee.
 2. Swap service will monitor the `SwapStarted` event and call `fillETH2BSCSwap` via BSCSwapAgent to mint corresponding bep20
 tokens to the same address that initiate the swap.
 
@@ -41,19 +41,53 @@ npm run generate
 
 ## Test
 
-Generate test contracts from templates:
+Run the development network:
+
 ```javascript
-npm run generate-test
+npm run testrpc
+```
+
+Deploy to development network:
+
+```javascript
+npx truffle migrate --reset
 ```
 
 Run tests:
 
 ```javascript
-npm run truffle:test
+npx truffle test
 ```
 
 Run coverage:
 
 ```javascript
 npm run coverage
+```
+
+## Deply & Verify
+
+### Deploy
+
+```javascript
+npx truffle migrate --network ropsten --reset
+```
+
+Please put the registerTx to ETH_REGISTER_TX in .env
+
+```javascript
+npx truffle migrate --network bsctestnet --reset
+```
+
+BSC DVG token must give a minter role to the deployed BSCSwapAgentUpgradeableProxy contract.
+
+### Verify
+
+```javascript
+npx truffle run verify ETHSwapAgentImpl --network ropsten
+npx truffle run verify ETHSwapAgentUpgradeableProxy --network ropsten
+
+npx truffle run verify BEP20TokenImplementation --network bsctestnet
+npx truffle run verify BSCSwapAgentImpl --network bsctestnet
+npx truffle run verify BSCSwapAgentUpgradeableProxy --network bsctestnet
 ```
