@@ -1,7 +1,6 @@
 pragma solidity 0.6.4;
 
 import "./interfaces/ISwap.sol";
-import "./interfaces/IBEP20.sol";
 import "./bep20/BEP20UpgradeableProxy.sol";
 import './interfaces/IProxyInitialize.sol';
 import "openzeppelin-solidity/contracts/token/ERC20/SafeERC20.sol";
@@ -9,6 +8,7 @@ import "openzeppelin-solidity/contracts/proxy/Initializable.sol";
 import "openzeppelin-solidity/contracts/GSN/Context.sol";
 
 contract  BSCSwapAgentImpl is Context, Initializable {
+
 
     using SafeERC20 for IERC20;
 
@@ -105,36 +105,6 @@ contract  BSCSwapAgentImpl is Context, Initializable {
     }
 
     /**
-     * @dev createSwapPairWithBep20
-     */
-    function createSwapPairWithBep20(bytes32 ethTxHash, address erc20Addr, string calldata name, string calldata symbol, uint8 decimals, address bep20Addr) onlyOwner external returns (address) {
-        require(swapMappingETH2BSC[erc20Addr] == address(0x0), "duplicated swap pair");
-        require(swapMappingBSC2ETH[bep20Addr] == address(0x0), "duplicated bep20 token");
-
-        string memory _name = IBEP20(bep20Addr).name();
-        string memory _symbol = IBEP20(bep20Addr).symbol();
-        uint8 _decimals = IBEP20(bep20Addr).decimals();
-
-        require(_compareString(_name, name), "Not same name between tokens");
-        require(_compareString(_symbol, symbol), "Not same symbol between tokens");
-        require(_decimals == decimals, "Not same decimals between tokens");
-
-        swapMappingETH2BSC[erc20Addr] = bep20Addr;
-        swapMappingBSC2ETH[bep20Addr] = erc20Addr;
-
-        emit SwapPairCreated(ethTxHash, bep20Addr, erc20Addr, symbol, name, decimals);
-        return bep20Addr;
-    }
-
-    function _compareString(string memory str1, string memory str2) pure internal returns(bool) {
-        if(keccak256(abi.encodePacked(str1)) == keccak256(abi.encodePacked(str2))) {
-            return true;
-        }else{
-            return false;
-        }
-    }
-
-    /**
      * @dev fillETH2BSCSwap
      */
     function fillETH2BSCSwap(bytes32 ethTxHash, address erc20Addr, address toAddress, uint256 amount) onlyOwner external returns (bool) {
@@ -142,7 +112,7 @@ contract  BSCSwapAgentImpl is Context, Initializable {
         address bscTokenAddr = swapMappingETH2BSC[erc20Addr];
         require(bscTokenAddr != address(0x0), "no swap pair for this token");
         filledETHTx[ethTxHash] = true;
-        ISwap(bscTokenAddr).mint(toAddress, amount);
+        ISwap(bscTokenAddr).mintTo(amount, toAddress);
         emit SwapFilled(bscTokenAddr, ethTxHash, toAddress, amount);
 
         return true;
@@ -155,7 +125,8 @@ contract  BSCSwapAgentImpl is Context, Initializable {
         require(erc20Addr != address(0x0), "no swap pair for this token");
         require(msg.value == swapFee, "swap fee not equal");
 
-        ISwap(bep20Addr).burn(msg.sender, amount);
+        IERC20(bep20Addr).safeTransferFrom(msg.sender, address(this), amount);
+        ISwap(bep20Addr).burn(amount);
         if (msg.value != 0) {
             owner.transfer(msg.value);
         }

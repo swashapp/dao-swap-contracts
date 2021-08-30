@@ -122,7 +122,7 @@ contract  BSCSwapAgentImpl is Context, Initializable {
         address bscTokenAddr = swapMappingETH2BSC[erc20Addr];
         require(bscTokenAddr != address(0x0), "no swap pair for this token");
         filledETHTx[ethTxHash] = true;
-        ISwap(bscTokenAddr).mint(toAddress, amount);
+        ISwap(bscTokenAddr).mintTo(amount, toAddress);
         emit SwapFilled(bscTokenAddr, ethTxHash, toAddress, amount);
 
         return true;
@@ -135,7 +135,8 @@ contract  BSCSwapAgentImpl is Context, Initializable {
         require(erc20Addr != address(0x0), "no swap pair for this token");
         require(msg.value == swapFee, "swap fee not equal");
 
-        ISwap(bep20Addr).burn(msg.sender, amount);
+        IERC20(bep20Addr).safeTransferFrom(msg.sender, address(this), amount);
+        ISwap(bep20Addr).burn(amount);
         if (msg.value != 0) {
             owner.transfer(msg.value);
         }
